@@ -15,17 +15,21 @@ services:
       - mongodb_config:/data/configdb
 
   mongodb-profiler-exporter:
-    image: ivanmillan36/mongodb-profiler-exporter:latest
+    build: ./app
     ports:
       - "2233:2233"
+    env_file:
+      - ./app/.env
     environment:
-      PORT: "2233"
-      MONGODB_URI: "mongodb://admin:admin@mongodb:27017?authSource=admin"
-      MONGO_USERNAME: "admin"
-      MONGO_PASSWORD: "admin"
-      MONGO_HOST: "mongodb"
-      MONGO_PORT: "27017"
-      IGNORED_COLLECTIONS: "event_record.system"
+      PORT: 2233
+      MONGODB_URI: mongodb://admin:admin@mongodb:27017/test?authSource=admin
+      MONGO_USERNAME: admin
+      MONGO_PASSWORD: admin
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      IGNORED_COLLECTIONS: event_record.system
+    volumes:
+      - ./app:/app
     depends_on:
       - mongodb
 
@@ -51,4 +55,3 @@ volumes:
   mongodatavolume:
   mongodb_config:
   grafana-storage:
-
