@@ -8,8 +8,6 @@ COPY . .
 # Instalar dependencias
 RUN npm install
 
-#COPY exporter.js .
-
 # Exponer el puerto del exporter
 EXPOSE 2233
 
