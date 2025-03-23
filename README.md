@@ -157,6 +157,64 @@ To prevent memory leaks, the exporter:
 - Increase the cleanup frequency by reducing CLEANUP_INTERVAL
 - Filter databases or collections you don't need to monitor
 
+## Docker Compose Example
+
+```yaml
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    command:
+      - --profile=2
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    volumes:
+      - mongodatavolume:/data/db
+      - mongodb_config:/data/configdb
+
+  mongodb-profiler-exporter:
+    image: ivanmillan36/mongodb-profiler-exporter:latest
+    ports:
+      - "2233:2233"
+    environment:
+      PORT: "2233"
+      MONGODB_URI: "mongodb://admin:admin@mongodb:27017?authSource=admin"
+      MONGO_USERNAME: "admin"
+      MONGO_PASSWORD: "admin"
+      MONGO_HOST: "mongodb"
+      MONGO_PORT: "27017"
+      IGNORED_COLLECTIONS: "event_record.system"
+    depends_on:
+      - mongodb
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - mongodb-profiler-exporter
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  mongodatavolume:
+  mongodb_config:
+  grafana-storage:
+```
+
 ## Contributions
 
 Contributions are welcome. Please submit a Pull Request or open an Issue to discuss proposed changes.
