@@ -61,12 +61,30 @@ For the exporter to work correctly, profiling must be enabled in MongoDB:
 ### Available Endpoints
 
 - **GET /metrics**: Endpoint for Prometheus, exposes metrics in Prometheus format.
-
-### Example Usage with curl
+- **GET /grafana-metrics**: Endpoint for Grafana, exposes metrics in a format compatible with the Grafana SimpleJson plugin or infinity plugin.
 
 ## Grafana Integration
 
 The project includes a predefined Grafana dashboard (`/grafana/mongodbProfilerViewer.json`) that displays queries in tabular format.
+
+### Configuring Grafana with Infinity Plugin
+
+1. Access Grafana (http://localhost:3000 by default)
+2. Go to "Configuration" > "Data Sources"
+3. Add new pluging Infinity
+4. Add a new data source with the following configuration:
+   - Name: MongoDB Profiler
+   - Type: Infinity
+   - URL: http://localhost:2233/grafana-metrics
+
+### Configuring Grafana with Prometheus
+
+1. Access Grafana (http://localhost:3000 by default)
+2. Go to "Configuration" > "Data Sources"
+3. Add a new data source with the following configuration:
+   - Name: Prometheus
+   - Type: Prometheus
+   - URL: http://localhost:9090
 
 ### Importing the Predefined Dashboard
 

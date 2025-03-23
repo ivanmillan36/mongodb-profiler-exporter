@@ -331,6 +331,22 @@ app.get('/metrics', async (req, res) => {
   res.end(await register.metrics());
 });
 
+// Endpoint para Grafana JSON
+app.get('/grafana-metrics', (req, res) => {
+  // Formatear los datos de queries para Grafana
+  const metrics = Array.from(state.metricTimestamps.keys()).map(id => {
+    // Encontrar la consulta en recentQueries
+    const query = state.recentQueries.find(q => q.id === id);
+    if (!query) return null;
+    
+    return {
+      query_data: query
+    };
+  }).filter(Boolean);
+  
+  res.json(metrics);
+});
+
 // Initialize server
 async function startServer() {
   // Set up metrics cleanup
