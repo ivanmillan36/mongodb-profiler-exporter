@@ -56,6 +56,24 @@ For the exporter to work correctly, profiling must be enabled in MongoDB:
 
 > Note: If you use the provided docker-compose, MongoDB already starts with profiling enabled.
 
+#### Enabling Profiling with mongosh and creating a system.profile collection
+This will log all queries
+```shell
+use admin
+db.createCollection("system.profile", { 
+  capped: true, 
+  size: 100 * 1024 * 1024  // 100MB máximo
+})
+db.setProfilingLevel(2)
+```
+
+#### Enabling Profiling with mongosh and slowms
+This will log queries that take more than 100ms
+```shell
+use admin
+db.setProfilingLevel(1, 100) 
+```
+
 ## Usage
 
 ### Available Endpoints

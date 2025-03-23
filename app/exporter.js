@@ -53,6 +53,14 @@ const mongodbQueryDetails = new client.Gauge({
   registers: [register]
 });
 
+const mongodbQueryCounter = new client.Counter({
+  name: 'mongodb_query_count',
+  help: 'Number of MongoDB queries by type',
+  labelNames: ['database', 'collection', 'operation_type', 'plan_summary'],
+  registers: [register]
+});
+
+
 // State management
 const state = {
   processedIds: new Set(),
@@ -205,12 +213,20 @@ function processProfileEntry(entry) {
       millis: millis.toString(),
       docs_examined: (entry.nreturned || entry.docsExamined || 0).toString(),
       keys_examined: (entry.keysExamined || 0).toString(),
-      plan_summary: entry.planSummary ? entry.planSummary : 'none',
+      plan_summary: entry.planSummary ? entry.planSummary : 'N/A',
       query_pattern: queryPattern,
       timestamp: QueryInfo.timestamp
     },
     1
   );
+  
+  // Increment query counter
+  mongodbQueryCounter.inc({
+    database,
+    collection,
+    operation_type: operationType,
+    plan_summary: entry.planSummary || 'N/A'
+  });
   
   // Register timestamp for expiration
   state.metricTimestamps.set(entryId, Date.now());
