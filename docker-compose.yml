@@ -22,7 +22,7 @@ services:
       - ./app/.env
     environment:
       PORT: 2233
-      MONGODB_URI: mongodb://admin:admin@mongodb:27017/test?authSource=admin
+      MONGODB_URI: mongodb://admin:admin@mongodb:27017/?authSource=admin
       MONGO_USERNAME: admin
       MONGO_PASSWORD: admin
       MONGO_HOST: mongodb
