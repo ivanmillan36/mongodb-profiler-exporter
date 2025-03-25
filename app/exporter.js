@@ -20,7 +20,7 @@ const config = {
     uri: process.env.MONGO_URI || '',
     systemDbs: ['admin', 'local', 'config'],
     // Colecciones a evitar en cualquier base de datos (configurable por variable de entorno)
-    ignoredCollections: (process.env.IGNORED_COLLECTIONS ).split(',') || []
+    ignoredCollections: (process.env.IGNORED_COLLECTIONS).split(',') || []
   }
 };
 
@@ -60,6 +60,19 @@ const mongodbQueryCounter = new client.Counter({
   registers: [register]
 });
 
+const mongodbQueryDurationHistogram = new client.Histogram({
+  name: 'mongodb_query_duration_ms',
+  help: 'Duration of MongoDB queries in milliseconds',
+  labelNames: ['database', 'collection', 'operation_type'],
+  buckets: [
+    1, 5, 10, 25, 50, 75, // Consultas muy rápidas
+    100, 125, 150, 175, // Rango de rendimiento normal
+    200, 250, 300, 350, // Consultas más lentas pero aceptables
+    400, 500, 750, 1000, // Consultas lentas
+    2000, 5000, 10000 // Consultas problemáticas
+  ], // ms
+  registers: [register]
+});
 
 // State management
 const state = {
@@ -85,19 +98,19 @@ function generateQueryPattern(entry) {
 
 function formatTimestamp(ts) {
   if (!ts) return new Date().toISOString();
-  
+
   if (ts.$date) {
     return new Date(ts.$date).toISOString();
   } else if (typeof ts === 'object' && ts.getTime) {
     return new Date(ts.getTime()).toISOString();
   }
-  
+
   return new Date().toISOString();
 }
 
 function extractExecutionPlan(entry) {
   if (!entry.execStats) return 'N/A';
-  
+
   try {
     const plan = JSON.stringify(entry.execStats, null, 2);
     return plan.length > 1500 ? plan.substring(0, 1500) + '...' : plan;
@@ -109,7 +122,7 @@ function extractExecutionPlan(entry) {
 function extractQueryDetails(entry, operationType) {
   try {
     let details;
-    
+
     if (operationType === 'query' || operationType === 'find') {
       details = JSON.stringify(entry.query || entry.filter || {});
     } else if (operationType === 'update') {
@@ -124,7 +137,7 @@ function extractQueryDetails(entry, operationType) {
     } else {
       details = JSON.stringify(entry);
     }
-    
+
     return details.length > 1000 ? details.substring(0, 1000) + '...' : details;
   } catch (e) {
     return "Error processing details: " + e.message;
@@ -135,14 +148,14 @@ function extractQueryDetails(entry, operationType) {
 function cleanupOldMetrics() {
   const now = Date.now();
   const expiredIds = [];
-  
+
   state.metricTimestamps.forEach((timestamp, id) => {
     if (now - timestamp > METRIC_TTL) {
       mongodbQueryDetails.remove({ query_id: id });
       expiredIds.push(id);
     }
   });
-  
+
   expiredIds.forEach(id => state.metricTimestamps.delete(id));
   console.log(`Cleaned up ${expiredIds.length} old metrics`);
 }
@@ -150,38 +163,38 @@ function cleanupOldMetrics() {
 // Process a single profile entry
 function processProfileEntry(entry) {
   const entryId = `${entry.queryHash ?? "none"}-${entry.ts.getTime()}`;
-  
+
   // Skip if already processed
   if (state.processedIds.has(entryId)) {
     return null;
   }
-  
+
   // Extract data
   const operationType = entry.op || 'unknown';
   const ns = (entry.ns || '').split('.');
   const database = ns.length > 0 ? ns[0] : 'unknown';
   const collection = ns.length > 1 ? ns[1] : 'unknown';
-  
+
   // Skip ignored collections
   if (config.mongo.ignoredCollections.includes(`${database}.${collection}`)) {
     return null;
   }
-  
+
   // Mark as processed
   state.processedIds.add(entryId);
-  
+
   const millis = entry.millis || 0;
-  
+
   // Extract query details
   const queryDetails = extractQueryDetails(entry, operationType);
   const executionPlan = extractExecutionPlan(entry);
-  
+
   // Create query info object
   const QueryInfo = {
     id: entryId,
     timestamp: formatTimestamp(entry.ts),
     database,
-    collection, 
+    collection,
     operation: operationType,
     query: queryDetails,
     millis: millis,
@@ -199,10 +212,10 @@ function processProfileEntry(entry) {
     originatingCommand: entry.originatingCommand ? JSON.stringify(entry.originatingCommand) : 'N/A',
     responseLength: entry.responseLength || 0
   };
-  
+
   // Generate query pattern for metric grouping
   const queryPattern = generateQueryPattern(entry);
-  
+
   // Set metric
   mongodbQueryDetails.set(
     {
@@ -219,7 +232,7 @@ function processProfileEntry(entry) {
     },
     1
   );
-  
+
   // Increment query counter
   mongodbQueryCounter.inc({
     database,
@@ -227,10 +240,16 @@ function processProfileEntry(entry) {
     operation_type: operationType,
     plan_summary: entry.planSummary || 'N/A'
   });
-  
+
+  mongodbQueryDurationHistogram.observe({
+    database,
+    collection,
+    operation_type: operationType
+  }, millis);
+
   // Register timestamp for expiration
   state.metricTimestamps.set(entryId, Date.now());
-  
+
   return QueryInfo;
 }
 
@@ -239,46 +258,46 @@ async function processDatabaseProfile(mongoClient, dbName) {
   console.log(`Checking database: ${dbName}`);
   const db = mongoClient.db(dbName);
   let entriesProcessed = 0;
-  
+
   try {
     // Check profile level
     const profilingLevel = await db.command({ profile: -1 });
     console.log(`Profile level in ${dbName}: ${profilingLevel.was || 'unknown'}`);
-    
+
     // Check if system.profile exists
     const collections = await db.listCollections().toArray();
     const hasProfileCollection = collections.some(coll => coll.name === 'system.profile');
-    
+
     if (!hasProfileCollection) {
       console.log(`No system.profile found in ${dbName}`);
       return 0;
     }
-    
+
     // Count entries
     const count = await db.collection('system.profile').countDocuments({});
     console.log(`Found ${count} entries in system.profile for ${dbName}`);
-    
+
     // Process entries
     const profileEntries = await db.collection('system.profile').find({}).toArray();
-    
+
     for (const entry of profileEntries) {
       const QueryInfo = processProfileEntry(entry);
-      
+
       if (QueryInfo) {
         // Add to recent queries (newest first)
         state.recentQueries.unshift(QueryInfo);
         entriesProcessed++;
       }
     }
-    
+
     // Limit stored queries
     if (state.recentQueries.length > MAX_STORED_QUERIES) {
       state.recentQueries.length = MAX_STORED_QUERIES;
     }
-    
+
     console.log(`Processed ${entriesProcessed} new entries in ${dbName}`);
     return entriesProcessed;
-    
+
   } catch (dbError) {
     console.error(`Error processing ${dbName}: ${dbError}`);
     return 0;
@@ -288,44 +307,44 @@ async function processDatabaseProfile(mongoClient, dbName) {
 // Main monitoring function
 async function fetchQueries() {
   console.log("Starting query monitoring...");
-  
+
   const mongoClient = new MongoClient(uri);
-  
+
   try {
     await mongoClient.connect();
     console.log("Successfully connected to MongoDB");
-    
+
     // Continuous monitoring loop
     while (true) {
       try {
         console.log("Looking for queries...");
         let totalEntries = 0;
-        
+
         const dbList = await mongoClient.db().admin().listDatabases();
-        
+
         for (const dbInfo of dbList.databases) {
           const dbName = dbInfo.name;
-          
+
           // Skip system databases
           if (config.mongo.systemDbs.includes(dbName)) {
             continue;
           }
-          
+
           const processed = await processDatabaseProfile(mongoClient, dbName);
           totalEntries += processed;
         }
-        
+
         console.log(`Total entries processed: ${totalEntries}`);
-        
+
       } catch (e) {
         console.error(`General error: ${e}`);
       }
       console.log("Waiting for next iteration...\n");
-      
+
       // Wait before next iteration
       await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
     }
-    
+
   } catch (err) {
     console.error('Error connecting to MongoDB:', err);
     throw err; // Re-throw to allow restart logic
@@ -354,12 +373,12 @@ app.get('/grafana-metrics', (req, res) => {
     // Encontrar la consulta en recentQueries
     const query = state.recentQueries.find(q => q.id === id);
     if (!query) return null;
-    
+
     return {
       query_data: query
     };
   }).filter(Boolean);
-  
+
   res.json(metrics);
 });
 
@@ -367,11 +386,11 @@ app.get('/grafana-metrics', (req, res) => {
 async function startServer() {
   // Set up metrics cleanup
   setInterval(cleanupOldMetrics, CLEANUP_INTERVAL);
-  
+
   // Start server
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Metrics server listening on port ${PORT}`);
-    
+
     // Start data collection
     fetchQueries().catch(err => {
       console.error('Error in query monitoring:', err);
