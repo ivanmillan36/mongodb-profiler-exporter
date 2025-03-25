@@ -5,10 +5,10 @@
   "main": "exporter.js",
   "scripts": {
     "start": "node exporter.js",
-    "docker:build": "docker build -t $npm_config_username/mongodb-profiler-exporter:$npm_config_tag .",
-    "docker:push": "docker push $npm_config_username/mongodb-profiler-exporter:$npm_config_tag",
-    "docker:publish": "npm run docker:build --username=$npm_config_username --tag=$npm_config_tag && npm run docker:push --username=$npm_config_username --tag=$npm_config_tag",
-    "docker:publish:latest": "npm run docker:publish --username=$npm_config_username --tag=latest"
+    "docker:build": "docker build -t ${npm_config_username:-ivanmillan36}/mongodb-profiler-exporter:${npm_config_tag:-latest} .",
+    "docker:push": "docker push ${npm_config_username:-ivanmillan36}/mongodb-profiler-exporter:${npm_config_tag:-latest}",
+    "docker:publish": "npm run docker:build --username=${npm_config_username:-ivanmillan36} --tag=${npm_config_tag:-latest} && npm run docker:push --username=${npm_config_username:-ivanmillan36} --tag=${npm_config_tag:-latest}",
+    "docker:publish:latest": "npm run docker:publish --tag=latest"
   },
   "dependencies": {
     "express": "^4.18.2",
