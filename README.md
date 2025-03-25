@@ -88,6 +88,11 @@ The project includes a predefined Grafana dashboard (`/grafana/mongodbProfilerVi
 - **Query Viewer**: Displays the most recent queries, including execution time, database, collection, and operation type.
 - **Query Metrics**: Shows the number of queries executed, the average execution time, and 95 percentile.
 
+![Captura de pantalla 2025-03-25 a las 8 28 41 a  m](https://github.com/user-attachments/assets/28e86087-4443-49ed-affe-c105fc76dc66)
+
+![Captura de pantalla 2025-03-25 a las 8 29 07 a  m](https://github.com/user-attachments/assets/527ebe9f-d902-4046-a1c8-5e18340d9d07)
+
+
 
 ### Configuring Grafana with Infinity Plugin
 
