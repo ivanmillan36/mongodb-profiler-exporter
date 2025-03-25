@@ -85,6 +85,10 @@ db.setProfilingLevel(1, 100)
 
 The project includes a predefined Grafana dashboard (`/grafana/mongodbProfilerViewer.json`) that displays queries in tabular format.
 
+- **Query Viewer**: Displays the most recent queries, including execution time, database, collection, and operation type.
+- **Query Metrics**: Shows the number of queries executed, the average execution time, and 95 percentile.
+
+
 ### Configuring Grafana with Infinity Plugin
 
 1. Access Grafana (http://localhost:3000 by default)
